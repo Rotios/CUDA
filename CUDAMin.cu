@@ -1,6 +1,5 @@
 /*
   @ 2017 Jose Rivas-Garcia and John Freeman
-  This code will help find the minimum value in an array in O(1) parallel time.
   The code creates n*n blocks, which perform the n*n comparisons.
 */
 #include "cuda_runtime.h"
