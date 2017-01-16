@@ -111,7 +111,7 @@ int findMax(int *arr, const int length) {
     cudaMalloc((void**)&max, intSize);
 
     minCompare << < dim3(length, length), 1 >> > (arr, check);
-    cudaMin << < dim3(length, 1), 1 >> > (arr, check, min);
+    cudaMin <<< dim3(length, 1), 1 >> > (arr, check, max);
 
     int maxhost[1];
     cudaMemcpy(maxhost, max, intSize, cudaMemcpyDeviceToHost);
@@ -195,7 +195,8 @@ int main()
 
         clock_t start = clock();
 
-        int min = findMin(a, arraySize);
+        int min;
+        findMin(a, arraySize, min);
 
         clock_t stop = clock();
         double elapsed = ((double)(stop - start)) / CLOCKS_PER_SEC;
