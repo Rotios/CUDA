@@ -8,27 +8,29 @@
 #define INITIAL_CAPACITY 1024
 
 /******************** Find the min value **************************/
-__global__ void minCompare(int *a, bool *check) {
+__global__ void minCompare(int *a, int set, bool *check) {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     int idy = threadIdx.y + blockIdx.y * blockDim.y;
+    int tabx = idx * 1024 + set;
+    int taby = idy * 1024 + set;
 
     if (idx == idy) { return; }
 
-    int xval = a[idx];
-    int yval = a[idy];
+    int xval = a[tabx];
+    int yval = a[taby];
     
-    if (xval == 0) {
+    if (xval == 0 || xval == 1) {
         check[idx] = false;
     } else if (xval > yval) {
         check[idx] = false;
     }
 }
 
-__global__ void cudaMin(int *a, bool *check, int* min) {
+__global__ void cudaMin(int *a, int set, bool *check, int* min) {
     int idx = blockIdx.x;
 
     if (check[idx]) {
-        min[0] = a[idx];
+        min[0] = a[idx * 1024 + set];
     }
 }
 
@@ -64,9 +66,11 @@ __global__ void cudaBoolFill(bool *arr, int length) {
 }
 
 /********************** Min and Max Functions ******************************************/
-void findMin(int *arr, const int length, int *minimum) {
+void findMin(int *arr, const int length, const int offset, int *minimum) {
     bool *check;
     int *min;
+    int *set;
+    int one = 1;
 
     const int intSize = sizeof(int);
     const int bsize = length * sizeof(bool);
@@ -75,9 +79,14 @@ void findMin(int *arr, const int length, int *minimum) {
     cudaBoolFill<<< dim3(length, 1), 1 >>>(check, length);
 
     cudaMalloc((void**)&min, intSize);
+    //cudaMemcpy(min, (void*)&one, intSize, cudaMemcpyHostToDevice);
 
-    minCompare<<< dim3(length, length), 1 >>>(arr, check);
-    cudaMin<<< dim3(length, 1), 1 >>>(arr, check, min);
+    cudaMalloc((void**)&set, intSize);
+
+    cudaMemcpy(set, (int*)&offset, intSize, cudaMemcpyHostToDevice);
+
+    minCompare<<< dim3(length, length), 1 >>>(arr, *set, check);
+    cudaMin<<< dim3(length, 1), 1 >>>(arr, *set, check, min);
 
     int minhost[1];
     cudaMemcpy(minhost, min, intSize, cudaMemcpyDeviceToHost);
@@ -114,14 +123,14 @@ int findMax(int *arr, const int length) {
 }
 
 /********************* Find the Curl *****************************************/
-int findCurl(int *sequence, int **table, int length){
+int findCurl(int *sequence, int *table, int length){
     int *tempResults;
     cudaMalloc((void **) &tempResults, (length >> 1) * sizeof(int));
 
     for(int i(0); i < (length >> 1); ++i) {
-        int *p = &(table[i][(length - 1) - i]);
+        //int *p = &(table[i][(length - 1) - i]);
         //findMin(p, length, &(tempResults[i]));
-        findMin(p, i+1, &(tempResults[i]));
+        findMin(table, i+1, (length - 1) - i, &(tempResults[i]));
     }
     int curl = findMax(tempResults, length);
 
@@ -130,38 +139,38 @@ int findCurl(int *sequence, int **table, int length){
     return curl;
 }
 
-void printTable(int **table, int length) {
-    int *row;
-    row = (int *) malloc(length * sizeof(int));
+void printTable(int *table, int length) {
+    int *CPUTable;
+    CPUTable = (int *) malloc(INITIAL_CAPACITY * INITIAL_CAPACITY * sizeof(int));
+    cudaMemcpy(CPUTable, table, INITIAL_CAPACITY * INITIAL_CAPACITY * sizeof(int), cudaMemcpyDeviceToHost);
 
     for(int i(0); i < length; ++i) {
-        cudaMemcpy(row, table[i], length * sizeof(int), cudaMemcpyDeviceToHost);
         for(int j(0); j < length; ++j) {
-            printf("%d ", row[j]);
+            printf("%d ", CPUTable[(i * 1024) + j]);
         }
         printf("\n");
     }
 
-    free(row);
+    free(CPUTable);
 }
 
-__global__ void fillColumn(int *sequence, int **table, int *seqPosition) {
+__global__ void fillColumn(int *sequence, int *table, int *seqPosition) {
     int row = threadIdx.x + blockIdx.x * blockDim.x;
     int index = *seqPosition;
     int value = 1;
     
     if(row == index){}
     else if(sequence[index - (row + 1)] == sequence[index]) {
-        value = table[row][index - (row + 1)] + 1;
+        value = table[(row * 1024) + (index - (row + 1))] + 1;
     }
 
-    table[row][index] = value;
+    table[(row * 1024) + index] = value;
 }
 
-void initializeTable(int *sequence, int **table, int length) {
+void initializeTable(int *sequence, int *table, int length) {
 
-     int *index;
-     cudaMalloc((void **)&index, sizeof(int *));
+    int *index;
+    cudaMalloc((void **)&index, sizeof(int *));
 
     for(int i(0); i < length; ++i) {
         cudaMemcpy(index, (void *)&i, sizeof(int), cudaMemcpyHostToDevice);
@@ -172,28 +181,16 @@ void initializeTable(int *sequence, int **table, int length) {
     cudaFree(index);
 }
 
-__global__ void zeroTable(int **table) {
-    int row = threadIdx.x + blockIdx.x * blockDim.x;
-    int column = threadIdx.y + blockIdx.y * blockDim.y;
-
-    table[row][column] = 0;
-}
-
 int main()
 {
-    int **table;
+    int *table;
 
-    cudaMalloc((void**) &table, INITIAL_CAPACITY * sizeof(int *));
-    for(int i(0); i < INITIAL_CAPACITY; ++i) {
-        cudaMalloc((void**) &(table[i]), INITIAL_CAPACITY * sizeof(int));
-    }
-    zeroTable<<<dim3(INITIAL_CAPACITY, INITIAL_CAPACITY), 1>>>(table);
+    cudaMalloc((void**)&table, (INITIAL_CAPACITY * INITIAL_CAPACITY) * sizeof(int));
 
     while (1) {
-        /*for(int i(0); i < INITIAL_CAPACITY; ++i) {
-            cudaMemset(table[i], 0, INITIAL_CAPACITY * sizeof(int));
-        }*/
 
+        cudaMemset(table, 0, (INITIAL_CAPACITY * INITIAL_CAPACITY) * sizeof(int));
+        
         char buffer[100];
 
         printf("Input a sequence to curl:\n");
