@@ -1,3 +1,7 @@
+// (c) 2017 John Freeman and Jose Rivas
+// Sorts and array using the bitonic sorting algorithm.
+// For more information, go here: http://www.cse.buffalo.edu/faculty/miller/Courses/CSE633/Mullapudi-Spring-2014-CSE633.pdf
+
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 
@@ -11,6 +15,8 @@ __global__ void swap(int *a, const int arraySize, const int step, const int stag
     int listSize = 2 << step;
     int ij = i^stage;
 
+    // Thanks to Matthias Endler for these lines (16 and 19) of code, which was what we needed to get our algorithm working correctly.
+    // Code can be found here: https://gist.github.com/mre/1392067
     if (ij > i) {
         if ((i&listSize) == 0) {
 
