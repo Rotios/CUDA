@@ -222,14 +222,13 @@ int main() {
             sequence[i] = buffer[i] - '0';
         }
 
-        int arraySize = i;
-        int *a;
-        int iSize = arraySize * sizeof(int);
-        cudaMalloc((void**)&a, iSize);
-        cudaMemcpy(a, sequence, iSize, cudaMemcpyHostToDevice);
+        int seqLength = i;
+        int sequenceByteSize = seqLength * sizeof(int);
+        int *cudaSequence;
+        cudaMalloc((void**)&cudaSequence, sequenceByteSize);
+        cudaMemcpy(cudaSequence, sequence, sequenceByteSize, cudaMemcpyHostToDevice);
 
-        initializeTable(a, table, arraySize, capacity);
-        printTable(table, arraySize, capacity);
+        initializeTable(cudaSequence, table, seqLength, capacity);
 
         clock_t start = clock();
 
@@ -238,18 +237,18 @@ int main() {
         int *cap;
         cudaMalloc((void **)&cap, sizeof(int));
         cudaMemcpy(cap, (void *)&capacity, sizeof(int), cudaMemcpyHostToDevice);
-        int curl = (arraySize == 1) ? 1: 0;
+        int curl = (seqLength == 1) ? 1: 0;
 
         while(curl != 1) {
-            curl = findCurl(a, table, arraySize, capacity);
+            curl = findCurl(cudaSequence, table, seqLength, capacity);
             printf("curl = %d\n", curl);
-            printTable(table, arraySize, capacity);
-            sequence[arraySize] = curl;
-            cudaMemcpy(size, (int*)&arraySize, sizeof(int), cudaMemcpyHostToDevice);
-            iSize = ++arraySize * sizeof(int);
-            cudaMalloc((void**)&a, iSize);
-            cudaMemcpy(a, sequence, iSize, cudaMemcpyHostToDevice);
-            fillColumn<<< dim3(arraySize, 1), 1 >>>(a, table, size, cap);
+            printTable(table, seqLength, capacity);
+            sequence[seqLength] = curl;
+            cudaMemcpy(size, (int*)&seqLength, sizeof(int), cudaMemcpyHostToDevice);
+            sequenceByteSize = ++seqLength * sizeof(int);
+            cudaMalloc((void**)&cudaSequence, sequenceByteSize);
+            cudaMemcpy(cudaSequence, sequence, sequenceByteSize, cudaMemcpyHostToDevice);
+            fillColumn<<< dim3(seqLength, 1), 1 >>>(cudaSequence, table, size, cap);
         }
 
         clock_t stop = clock();
@@ -257,13 +256,12 @@ int main() {
         printf("Elapsed time: %.3fs\n", elapsed);
         printf("curl is %d\n\nsequence = ", curl);
 
-        
-        for(i = 0; i < arraySize; ++i){
+        for(i = 0; i < seqLength; ++i){
             printf("%d ", sequence[i]);
         }
 
         printf("\n\n");
-        cudaFree(a);
+        cudaFree(cudaSequence);
     }
     return 0;
 }
