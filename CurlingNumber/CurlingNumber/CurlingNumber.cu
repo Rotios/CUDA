@@ -22,8 +22,8 @@ __global__ void minCompare(int *a, int *set, bool *check, int *capacity) {
     int xval = a[tabx];
     int yval = a[taby];
     
-    if(yval <= 1) {}
-    else if (xval <= 1) {
+    if(yval == 0) {}
+    else if (xval == 0) {
         check[idx] = false;
     } else if (xval > yval) {
         check[idx] = false;
@@ -254,6 +254,8 @@ int main() {
 
         while(curl != 1) {
             curl = findCurl(a, table, arraySize, capacity);
+            printf("curl = %d\n", curl);
+            printTable(table, arraySize, capacity);
             sequence[arraySize] = curl;
             cudaMemcpy(size, (int*)&arraySize, sizeof(int), cudaMemcpyHostToDevice);
             iSize = ++arraySize * sizeof(int);
@@ -265,8 +267,14 @@ int main() {
         clock_t stop = clock();
         double elapsed = ((double)(stop - start)) / CLOCKS_PER_SEC;
         printf("Elapsed time: %.3fs\n", elapsed);
-        printf("curl is %d\n", curl);
+        printf("curl is %d\n\nsequence = ", curl);
 
+        
+        for(i = 0; i < arraySize; ++i){
+            printf("%d ", sequence[i]);
+        }
+
+        printf("\n\n");
         cudaFree(a);
     }
     return 0;
