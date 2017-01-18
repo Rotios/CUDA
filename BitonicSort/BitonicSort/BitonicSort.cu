@@ -13,10 +13,10 @@ __global__ void swap(int *a, const int arraySize, const int step, const int stag
 {
     int i = threadIdx.x;
     int listSize = 2 << step;
-    int ij = i^stage;
 
-    // Thanks to Matthias Endler for these lines (16 and 19) of code, which was what we needed to get our algorithm working correctly.
+    // Thanks to Matthias Endler for these lines (19 and 20) of code, which was what we needed to get our algorithm working correctly.
     // Code can be found here: https://gist.github.com/mre/1392067
+    int ij = i^stage;
     if (ij > i) {
         if ((i&listSize) == 0) {
 
