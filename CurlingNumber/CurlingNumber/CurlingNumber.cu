@@ -74,18 +74,13 @@ void findMin(int *arr, const int length, const int offset, int *minimum, int *ca
     //length - 1 = row, offset = location of first element
 
     bool *check;
-    int *min;
     int *set;
     int *row = (int*) malloc(sizeof(int));
-    int one = 1;
     const int intSize = sizeof(int);
     const int bsize = length * sizeof(bool);
 
     cudaMalloc((void**)&check, bsize);
     cudaBoolFill<<< dim3(length, 1), 1 >>>(check, length);
-
-    cudaMalloc((void**)&min, intSize);
-    cudaMemcpy(min, (void*)&one, intSize, cudaMemcpyHostToDevice);
 
     cudaMalloc((void**)&set, intSize);
     cudaMemcpy(set, (int*)&offset, intSize, cudaMemcpyHostToDevice);
@@ -100,16 +95,9 @@ void findMin(int *arr, const int length, const int offset, int *minimum, int *ca
     cudaMemcpy(row2, row, intSize, cudaMemcpyHostToDevice);
 
     minCompare<<< dim3(length, length), 1 >>>(arr, set, check, row2);
-    cudaMin<<< dim3(length, 1), 1 >>>(arr, set, check, min, row2);
+    cudaMin<<< dim3(length, 1), 1 >>>(arr, set, check, minimum, row2);
 
-    int minhost[1];
-    cudaMemcpy(minhost, min, intSize, cudaMemcpyDeviceToHost);
-
-    cudaFree(min);
     cudaFree(check);
-
-    cudaMemcpy(minimum, (void *)&(minhost[0]), intSize, cudaMemcpyHostToDevice);
-    //minimum = minhost[0];
 }
 
 int findMax(int *arr, const int length) {
@@ -250,7 +238,7 @@ int main() {
         int *cap;
         cudaMalloc((void **)&cap, sizeof(int));
         cudaMemcpy(cap, (void *)&capacity, sizeof(int), cudaMemcpyHostToDevice);
-        int curl = 0;
+        int curl = (arraySize == 1) ? 1: 0;
 
         while(curl != 1) {
             curl = findCurl(a, table, arraySize, capacity);
